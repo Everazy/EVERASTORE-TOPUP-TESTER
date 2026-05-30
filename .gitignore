@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Environment variables (RAHASIA - jangan pernah commit nilai asli)
+.env
+.env.local
+.env.*.local
+
+# Vercel
+.vercel
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Build output
+dist/
+.cache/

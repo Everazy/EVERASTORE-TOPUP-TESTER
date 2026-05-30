@@ -1,0 +1,93 @@
+rules_version = '2';
+
+// ============================================================
+// EVERASTORE - Firestore Security Rules
+// ============================================================
+//
+// ⚠️ BACA INI DULU SEBELUM DEPLOY:
+//
+// Web ini punya DUA cara akses Firestore:
+//   1. Browser (frontend)  -> hanya MEMBACA koleksi "products".
+//   2. Serverless function -> baca/tulis "stocks", "orders",
+//      "pending_orders" lewat REST API + Firebase Web API Key.
+//
+// Firebase Web API Key itu BERSIFAT PUBLIK (ada di index.html).
+// REST API dengan API key saja dihitung "unauthenticated", dan
+// TETAP tunduk pada rules ini. Akibatnya: agar function bisa jalan,
+// koleksi sensitif harus mengizinkan akses unauthenticated.
+//
+// Itu berarti rules di bawah ("Option A") MEMBUAT APP JALAN, tapi
+// koleksi stocks/orders secara teknis bisa diakses siapa pun yang
+// tahu Project ID + API Key. Untuk toko skala kecil ini sering
+// diterima sementara, TAPI untuk benar-benar aman lihat "Option B"
+// di bagian bawah (pakai Admin SDK + service account).
+//
+// Kalau kamu SUDAH punya rules yang jalan di produksi, JANGAN
+// langsung timpa. Bandingkan dulu dengan ini.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- PRODUCTS: katalog produk ---
+    // Dibaca publik oleh frontend. Ditulis hanya oleh admin yang
+    // login via Firebase Auth (signInWithPassword di dashboard).
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // --- CATEGORIES / SETTINGS (jika ada) ---
+    match /categories/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /settings/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // ========================================================
+    // OPTION A (DEFAULT - APP JALAN, keamanan terbatas)
+    // Koleksi berikut dipakai serverless function via API key
+    // (unauthenticated). Dibiarkan terbuka agar function bekerja.
+    // Berisi data sensitif (kredensial akun & data pembeli),
+    // jadi PERTIMBANGKAN Option B untuk produksi serius.
+    // ========================================================
+    match /stocks/{doc} {
+      allow read, write: if true;
+    }
+    match /orders/{doc} {
+      allow read, write: if true;
+    }
+    match /pending_orders/{doc} {
+      allow read, write: if true;
+    }
+
+    // Default: tolak koleksi lain yang tidak terdaftar.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// ============================================================
+// OPTION B (DIREKOMENDASIKAN untuk produksi - PALING AMAN)
+// ------------------------------------------------------------
+// Ubah blok stocks/orders/pending_orders di atas menjadi:
+//
+//     match /stocks/{doc}         { allow read, write: if false; }
+//     match /orders/{doc}         { allow read, write: if false; }
+//     match /pending_orders/{doc} { allow read, write: if false; }
+//
+// LALU ubah semua serverless function agar memakai Firebase
+// Admin SDK (service account) yang otomatis MELEWATI rules ini.
+// Langkahnya:
+//   1. Firebase Console > Project settings > Service accounts >
+//      Generate new private key (dapat file JSON).
+//   2. Simpan isinya sebagai env var FIREBASE_SERVICE_ACCOUNT
+//      di Vercel (paste seluruh JSON).
+//   3. Minta bantuan untuk migrasi fungsi dari "fetch REST + API key"
+//      ke "firebase-admin". Setelah itu, koleksi sensitif tertutup
+//      total dari sisi publik.
+// ============================================================
